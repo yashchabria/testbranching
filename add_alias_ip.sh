@@ -1,3 +1,4 @@
+
 #!/bin/sh
 
 . /lib/functions/system.sh
@@ -9,6 +10,7 @@ CHK_ALIAS_IP="/tmp/chk_alias_ip"
 CHK_ROUTE="/tmp/chk_route"
 WAN_IF="eth0.2"
 
+echo "test"
 
 chk_add_alias_ip_old(){
         /sbin/ifconfig > $CHK_ALIAS_IP
