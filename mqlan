@@ -1,0 +1,25 @@
+#!/bin/sh /etc/rc.common
+
+
+
+#Company:MachineQ
+#Project:mqlan
+#Date: 06-AUG-2018
+
+
+START=90
+STOP=90
+
+start()
+{
+	echo 'Starting mqlan' >&2
+
+	echo 'network reload' >&2
+	/etc/init.d/network reload
+	
+	ifup -w wan
+	
+	#/etc/init.d/dnsmasq restart
+	
+}
+

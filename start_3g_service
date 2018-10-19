@@ -1,0 +1,33 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 
+
+. /lib/functions/message.sh
+
+START=15
+
+boot() {
+	export export PATH="$PATH:/app/db"
+
+	print_info "rc: ($START)3g service"
+    3g_init.sh 
+	sleep 3
+
+	#local kk=`ls /dev/ttyUSB2`
+    #    echo "USB=$kk">/dev/console
+    #    echo "USB=$kk">/dev/console
+    #    if [ "$kk" != "/dev/ttyUSB2" ]; then
+    #            echo "[Insmod 3g module] ">/dev/console
+    #           3g_init.sh &
+    #    fi
+	now_wantype=`uci get network.wan2x.wantype`
+    if [ "$now_wantype" = "3g" ]; then
+           echo "CFUN reset 4G" > /dev/console
+           gcom -d /dev/ttyUSB3 -s /mnt/data/sw_cfun0_reset.gcom
+           sleep 1
+           gcom -d /dev/ttyUSB3 -s /mnt/data/sw_cfun1_reset.gcom
+    fi
+}
+
+start() {
+	echo ""
+}

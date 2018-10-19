@@ -1,0 +1,82 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2006 OpenWrt.org
+
+START=99
+CRONTAB_ROOT="/etc/crontabs/root"
+CHK_3G="/sbin/check_3g_init_process.sh"
+CHK_PKT_NG_PROC="/usr/bin/monitor_pkt_ng.sh"
+MONITOR_TIME="1"
+
+boot() {
+
+	local now_mode=`uci get -c /mnt/data/config mfg.system.mode`
+	
+	# process user commands
+	[ -f /etc/rc.local ] && {
+		sh /etc/rc.local
+	}
+
+	/app/lora_pkg/create_fw_version.sh
+
+	# set wifi led
+	/usr/bin/ctl_wifi_led.sh
+
+	# set leds to normal state
+	. /etc/diag.sh
+	set_state done
+	
+	now_user_provision=`uci get -c /mnt/data/config/ mfg.system.user_provision`
+	if [ "$now_user_provision" = "" ]; then
+		gtk_led_ctl.sh pwr off
+		gtk_led_ctl.sh diag on
+	fi
+	
+	if [ "$now_mode" = "production" ]; then
+		
+		#Monitor 3G
+		now_wan_proto=`uci get network.wan2x.proto` # added to handle multiple 2nd WAN Interface Type
+
+		if [ "$now_wan_proto" = "3g" ] ; then
+			$CHK_3G &
+			sleep 10
+			if ! grep -q "$CHK_3G" $CRONTAB_ROOT ; then
+				sed -i '/chk_3g/d' $CRONTAB_ROOT
+				echo "*/1 * * * * $CHK_3G  #chk_3g"  >> $CRONTAB_ROOT
+			fi
+		else
+			sed -i '/chk_3g/d' $CRONTAB_ROOT
+		fi
+		
+		#Add monitor for PKT NG
+		IS_PKT_FWD_MODE=0
+		now_user_provision=`uci -c /mnt/data/config get mfg.system.user_provision`
+		PROVISION_PREFIX=`uci -c /mnt/data/config get mfg.system.user_provision | cut -c 1-2 | tr -d '\n'`
+		if [[ "$PROVISION_PREFIX" = "20" || "$PROVISION_PREFIX" = "21" || "$PROVISION_PREFIX" = "22" || "$PROVISION_PREFIX" = "23" || "$PROVISION_PREFIX" = "24" || "$PROVISION_PREFIX" = "25" || "$PROVISION_PREFIX" = "26" || "$PROVISION_PREFIX" = "27" ]]; then
+			IS_PKT_FWD_MODE=1
+		fi
+		if ! grep -q "$CHK_PKT_NG_PROC" $CRONTAB_ROOT ; then
+			if [[ "$now_user_provision" != "" && "$IS_PKT_FWD_MODE" != "1" ]]; then
+				if ! grep -q "$CHK_PKT_NG_PROC" $CRONTAB_ROOT ; then
+					echo "*/$MONITOR_TIME * * * * $CHK_PKT_NG_PROC  #monitor if pkt NG happen"  >> $CRONTAB_ROOT
+					/etc/init.d/cron restart
+				fi
+			fi
+		else
+			if [[ "$now_user_provision" = "" || "$IS_PKT_FWD_MODE" = "1" ]]; then
+				sed '/monitor if pkt NG happen/d' $CRONTAB_ROOT > /tmp/temp_cront
+				cp /tmp/temp_cront $CRONTAB_ROOT
+				/etc/init.d/cron restart
+			fi
+		fi
+	fi
+	# YKC: NOTE alias_ip_setup has been updated to do nothing 
+
+	now_wantype=`uci get network.wan2x.wantype`
+	if [ "$now_wantype" = "3g" ]; then
+		alias_ip_setup.sh 34g
+	elif [ "$now_wantype" = "extender" ]; then
+		alias_ip_setup.sh apcli
+	 else
+	 	alias_ip_setup.sh
+	fi
+}
